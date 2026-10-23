@@ -1,0 +1,48 @@
+# ==========================================
+# SecOps-Nexus Defense-in-Depth Git Ignore
+# Prevents accidental leakage of secrets, keys, and backups
+# ==========================================
+
+# Environment variables & secrets
+.env
+.env.*
+.env.local
+.env.production
+!.env.example
+
+# Private cryptographic keys & certificates
+*.pem
+*.key
+*.pkcs12
+*.pfx
+*.crt
+
+# Atomic backups created by automated code patcher
+*.bak
+*.bak.*
+
+# Immutable audit ledgers & runtime logs
+audit_ledger.jsonl
+*.log
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary generated test files
+vulnerable_sample.py
+vulnerable_sample.py.*

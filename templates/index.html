@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }}</title>
+  <meta name="description" content="Autonomous SOC & Automated Vulnerability Remediation Platform with Zero Trust Architecture and HITL Approval Gates.">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+
+  <!-- =========================================================================
+       1. SOC Cyber Command Header & Zero-Trust Status Ribbon
+       ========================================================================= -->
+  <header class="soc-header" role="banner">
+    <div class="brand-container">
+      <img src="/static/favicon.svg" alt="SecOps-Nexus Shield Logo" class="brand-logo" width="44" height="44">
+      <div class="brand-text">
+        <h1>SecOps-Nexus <span style="font-size: 0.65em; opacity: 0.7; font-weight: 500;">AUTONOMOUS SOC</span></h1>
+        <p>Zero-Trust Remediation &amp; Vulnerability Governance</p>
+      </div>
+    </div>
+
+    <div class="status-ribbon" role="status" aria-label="System Security Status">
+      <div class="status-badge" title="All inbound sensor alerts require HMAC-SHA256 signature verification">
+        <span class="status-dot active"></span>
+        <span>ZTA INGRESS: <b>HMAC-SHA256</b></span>
+      </div>
+      <div class="status-badge" title="PAM Vault issues single-use ephemeral credentials with 5-min TTL">
+        <span class="status-dot active"></span>
+        <span>PAM: <b>VAULT EPHEMERAL</b></span>
+      </div>
+      <div class="status-badge" title="Cryptographically sealed append-only audit trail">
+        <span class="status-dot active"></span>
+        <span>WORM LEDGER: <b>TAMPER-EVIDENT</b></span>
+      </div>
+      <div class="status-badge" title="Live WebSocket connection for telemetry and alert broadcast">
+        <span class="status-dot active"></span>
+        <span id="ws-status-text">CONNECTING...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       2. Dashboard Container
+       ========================================================================= -->
+  <main class="dashboard-container" role="main">
+
+    <!-- KPI Metric Cards -->
+    <section class="metrics-grid" aria-label="Key Security Metrics">
+      <div class="metric-card" id="card-total-alerts">
+        <div class="metric-label">Total Ingested Alerts</div>
+        <div class="metric-value" id="stat-total-alerts">{{ stats.total_alerts }}</div>
+        <div class="metric-sub">Trivy · Sonar · Nmap · Wazuh</div>
+      </div>
+
+      <div class="metric-card warning" id="card-pending-hitl">
+        <div class="metric-label">Pending HITL Approvals</div>
+        <div class="metric-value" id="stat-pending-hitl" style="color: var(--color-warning);">{{ stats.pending_hitl }}</div>
+        <div class="metric-sub">Awaiting Security Engineer Sign-off</div>
+      </div>
+
+      <div class="metric-card success" id="card-auto-contained">
+        <div class="metric-label">Auto-Contained Threats</div>
+        <div class="metric-value" id="stat-auto-contained" style="color: var(--color-success);">{{ stats.auto_contained }}</div>
+        <div class="metric-sub">Low-Risk Autonomous Actions</div>
+      </div>
+
+      <div class="metric-card critical" id="card-cisa-kev">
+        <div class="metric-label">Active CISA KEV Exploits</div>
+        <div class="metric-value" id="stat-cisa-kev" style="color: var(--color-critical);">{{ stats.cisa_kev_active }}</div>
+        <div class="metric-sub">In-The-Wild Exploitation Active</div>
+      </div>
+
+      <div class="metric-card purple" id="card-audit-blocks">
+        <div class="metric-label">Cryptographic Audit Blocks</div>
+        <div class="metric-value" id="stat-audit-blocks" style="color: var(--neon-purple);">{{ stats.total_audit_blocks }}</div>
+        <div class="metric-sub">SHA-256 Merkle Chained Blocks</div>
+      </div>
+    </section>
+
+    <!-- Mode Switcher: SOC Telemetry vs Real File Scanner -->
+    <nav class="mode-navigation-bar" aria-label="Command Mode Navigation" style="display: flex; gap: 0.75rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem;">
+      <button type="button" class="mode-nav-btn active" id="btn-mode-soc" onclick="switchViewMode('soc')">
+        🛡️ Autonomous SOC Telemetry
+      </button>
+      <button type="button" class="mode-nav-btn" id="btn-mode-scanner" onclick="switchViewMode('scanner')">
+        🔬 Real File &amp; Code Security Scanner &amp; Auto-Fix
+      </button>
+    </nav>
+
+    <!-- Threat Scenario Ingestion Simulator (SOC Mode) -->
+    <section class="simulator-bar" id="soc-simulator-bar" aria-label="Live Threat Simulator">
+      <div class="sim-info">
+        <span class="sim-icon">⚡</span>
+        <div class="sim-text">
+          <h4>Simulate Inbound Sensor Detections</h4>
+          <p>Trigger realistic CVEs and intrusions to watch the autonomous AI triage and HITL gate in real-time</p>
+        </div>
+      </div>
+      <div class="sim-buttons">
+        <button type="button" class="btn-sim" id="btn-sim-xz" onclick="triggerSimulation('xz_backdoor')" title="Simulates Trivy discovering CVE-2024-3094 in production ingress container">
+          🚨 <b>CVE-2024-3094</b> (XZ Backdoor)
+        </button>
+        <button type="button" class="btn-sim" id="btn-sim-sqli" onclick="triggerSimulation('sqli_attack')" title="Simulates SonarQube SAST discovering SQL Injection in billing controller">
+          💉 <b>SonarQube</b> (CWE-89 SQLi)
+        </button>
+        <button type="button" class="btn-sim" id="btn-sim-rdp" onclick="triggerSimulation('exposed_rdp')" title="Simulates Nmap discovering public RDP 3389 open on bastion host">
+          🌐 <b>Nmap</b> (Port 3389 Exposed)
+        </button>
+        <button type="button" class="btn-sim" id="btn-sim-wazuh" onclick="triggerSimulation('wazuh_brute_force')" title="Simulates Wazuh EDR detecting SSH dictionary brute-force attack">
+          🔨 <b>Wazuh EDR</b> (SSH Brute Force)
+        </button>
+      </div>
+    </section>
+
+    <!-- REAL CODE & FILE SCANNER WORKSPACE (Scanner Mode) -->
+    <section class="panel-card" id="real-file-scanner-panel" style="display: none;" aria-label="Real File & Code Security Scanner">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2>Industrial Code &amp; File Security Scanner</h2>
+          <span class="badge-count" id="scanner-file-status">Ready</span>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn-sim" onclick="generateVulnerableSample()" title="Creates a sample file with real vulnerabilities for testing">
+            🧪 Generate Test Vulnerable File
+          </button>
+        </div>
+      </div>
+
+      <p style="font-size: 0.85rem; color: var(--text-muted);">
+        Analyze real source files or directories for fatal syntax bugs, OWASP Top 10 vulnerabilities, hardcoded secrets, and unsafe deserialization. Review unified diffs and apply validated patches with atomic rollback safeguards.
+      </p>
+
+      <!-- Scan Input Bar -->
+      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+        <input type="text" id="scan-target-path" class="hitl-notes-input" style="flex: 2; min-width: 300px;" value="vulnerable_sample.py" placeholder="Enter file or directory path to scan (e.g. vulnerable_sample.py or .)">
+        <button type="button" class="btn-hitl approve" onclick="runFileScan()" id="btn-run-scan">
+          🔍 Analyze File
+        </button>
+        <button type="button" class="btn-sim" onclick="runDirectoryScan()" id="btn-run-dir-scan" style="padding: 0.65rem 1rem;">
+          📁 Scan Entire Codebase
+        </button>
+      </div>
+
+      <!-- Scan Results Summary Bar -->
+      <div id="scan-summary-bar" style="display: none; background: rgba(0, 243, 255, 0.05); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem 1.25rem;">
+        <div class="info-grid">
+          <div class="info-box">
+            <div class="info-box-title">Target Path</div>
+            <div class="info-box-value" id="scan-res-path" style="font-size: 0.85rem;">-</div>
+          </div>
+          <div class="info-box">
+            <div class="info-box-title">Total Issues Found</div>
+            <div class="info-box-value" id="scan-res-total" style="color: var(--color-warning);">0</div>
+          </div>
+          <div class="info-box">
+            <div class="info-box-title">Critical / RCE Flaws</div>
+            <div class="info-box-value" id="scan-res-critical" style="color: var(--color-critical);">0</div>
+          </div>
+          <div class="info-box">
+            <div class="info-box-title">Calculated Risk Score</div>
+            <div class="info-box-value" id="scan-res-risk">0.0 / 100</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Findings List & Auto-Fix Cards -->
+      <div id="scan-findings-container" style="display: flex; flex-direction: column; gap: 1rem;">
+        <div class="empty-state">
+          <p>No active file scan. Enter a file path above or click <b>"Generate Test Vulnerable File"</b> to start analyzing!</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Content: Triage Queue & Cryptographic Audit Ledger -->
+    <div class="main-grid" id="soc-main-grid">
+
+      <!-- Left Column: Alert Triage Queue -->
+      <section class="panel-card" aria-label="Vulnerability & Alert Triage Queue">
+        <div class="panel-header">
+          <div class="panel-title">
+            <h2>Vulnerability Triage Queue</h2>
+            <span class="badge-count" id="alert-filter-count">Loading...</span>
+          </div>
+          <div class="filter-tabs" role="tablist">
+            <button type="button" class="tab-btn active" data-filter="all" role="tab" id="tab-all">All Alerts</button>
+            <button type="button" class="tab-btn" data-filter="pending" role="tab" id="tab-pending">🛑 Pending HITL</button>
+            <button type="button" class="tab-btn" data-filter="critical" role="tab" id="tab-critical">⚠️ Critical &amp; KEV</button>
+            <button type="button" class="tab-btn" data-filter="auto" role="tab" id="tab-auto">🛡️ Resolved</button>
+          </div>
+        </div>
+
+        <div class="alert-list" id="alert-list-container" role="feed">
+          <div class="empty-state">
+            <p>Loading security telemetry feed...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: WORM Cryptographic Ledger -->
+      <aside class="panel-card" aria-label="WORM Cryptographic Audit Trail">
+        <div class="panel-header">
+          <div class="panel-title">
+            <h2>WORM Audit Ledger</h2>
+            <span class="badge-count">SHA-256</span>
+          </div>
+        </div>
+
+        <p style="font-size: 0.8rem; color: var(--text-muted);">
+          Tamper-evident append-only ledger. Every scan result, AI analysis, and approval click is cryptographically sealed.
+        </p>
+
+        <button type="button" class="btn-verify-chain" id="btn-verify-audit" onclick="verifyAuditLedger()">
+          🔍 Verify Blockchain Integrity
+        </button>
+
+        <div class="audit-stream" id="audit-stream-container">
+          <div class="empty-state">
+            <p>Loading cryptographic audit blocks...</p>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </main>
+
+  <!-- =========================================================================
+       3. Deep Inspection & HITL Approval Modal
+       ========================================================================= -->
+  <div class="modal-overlay" id="hitl-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-container">
+
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <div class="modal-header-content">
+          <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--neon-cyan); margin-bottom: 0.25rem;">
+            ALERT INSPECTION // <span id="modal-alert-id">ALT-XXXX</span>
+          </div>
+          <h3 id="modal-title">Vulnerability Title</h3>
+        </div>
+        <button type="button" class="btn-close" onclick="closeModal()" aria-label="Close Modal">&times;</button>
+      </div>
+
+      <!-- Modal Navigation Tabs -->
+      <div class="modal-tabs" role="tablist">
+        <button type="button" class="modal-tab active" data-tab="overview">Overview &amp; Context</button>
+        <button type="button" class="modal-tab" data-tab="ai">Gemini Intelligence &amp; MITRE</button>
+        <button type="button" class="modal-tab" data-tab="ansible">Ansible Remediation Diff</button>
+        <button type="button" class="modal-tab" data-tab="pam">PAM Ephemeral Session</button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="modal-body">
+
+        <!-- Tab 1: Overview -->
+        <div class="tab-pane active" id="tab-pane-overview">
+          <div class="info-grid">
+            <div class="info-box">
+              <div class="info-box-title">CVE / CWE ID</div>
+              <div class="info-box-value" id="modal-cve">CVE-2024-3094</div>
+            </div>
+            <div class="info-box">
+              <div class="info-box-title">CVSS &amp; Contextual Risk</div>
+              <div class="info-box-value" id="modal-cvss">10.0 (Risk: 95/100)</div>
+            </div>
+            <div class="info-box">
+              <div class="info-box-title">Target Host</div>
+              <div class="info-box-value" id="modal-host">k8s-prod-worker-01</div>
+            </div>
+            <div class="info-box">
+              <div class="info-box-title">Asset Criticality</div>
+              <div class="info-box-value" id="modal-criticality">TIER_0_MISSION_CRITICAL</div>
+            </div>
+            <div class="info-box">
+              <div class="info-box-title">Network Exposure</div>
+              <div class="info-box-value" id="modal-exposure">PUBLIC_INTERNET</div>
+            </div>
+            <div class="info-box">
+              <div class="info-box-title">Detection Source</div>
+              <div class="info-box-value" id="modal-source">TRIVY</div>
+            </div>
+          </div>
+
+          <div>
+            <h4 style="font-family: var(--font-main); font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--neon-cyan);">Executive Threat Summary</h4>
+            <div class="code-container" style="background: rgba(0,0,0,0.3); font-family: var(--font-body); font-size: 0.9rem;" id="modal-summary">
+              Loading summary...
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: AI Intelligence & MITRE -->
+        <div class="tab-pane" id="tab-pane-ai">
+          <div>
+            <h4 style="font-family: var(--font-main); font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--neon-cyan);">Mapped MITRE ATT&amp;CK Framework TTPs</h4>
+            <div id="modal-mitre-tags" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+          </div>
+
+          <div>
+            <h4 style="font-family: var(--font-main); font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--neon-cyan);">Real-World Exploitability Assessment</h4>
+            <div class="code-container" style="background: rgba(0,0,0,0.3); font-family: var(--font-body); font-size: 0.9rem;" id="modal-exploit"></div>
+          </div>
+
+          <div>
+            <h4 style="font-family: var(--font-main); font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--neon-cyan);">Blast Radius &amp; Service Availability Risk</h4>
+            <div class="code-container" style="background: rgba(0,0,0,0.3); font-family: var(--font-body); font-size: 0.9rem;" id="modal-blast"></div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Ansible Playbook -->
+        <div class="tab-pane" id="tab-pane-ansible">
+          <p style="font-size: 0.85rem; color: var(--text-muted);">
+            Autonomous Security Reasoning Engine generated this idempotent Ansible Playbook. Review the dry-run command and playbook syntax below before granting execution approval:
+          </p>
+
+          <div>
+            <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--neon-cyan); margin-bottom: 0.25rem;">
+              PRE-FLIGHT DRY RUN COMMAND:
+            </div>
+            <div class="code-container" style="padding: 0.75rem 1rem; color: var(--color-warning);" id="modal-dryrun-cmd">
+              ansible-playbook -i target.ini remediation.yml --check --diff
+            </div>
+          </div>
+
+          <div>
+            <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--neon-cyan); margin-bottom: 0.25rem;">
+              REMEDIATION PLAYBOOK (YAML):
+            </div>
+            <div class="code-container">
+              <pre id="modal-ansible-code">---</pre>
+            </div>
+          </div>
+
+          <!-- Execution Result if already executed -->
+          <div id="modal-exec-container" style="display: none;">
+            <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-success); margin-bottom: 0.25rem;">
+              EXECUTION LOG &amp; FORENSIC PROBE:
+            </div>
+            <div class="code-container" style="color: #a3e635;">
+              <pre id="modal-exec-stdout"></pre>
+            </div>
+            <div style="font-size: 0.8rem; margin-top: 0.5rem; color: var(--color-success);" id="modal-verification-text"></div>
+          </div>
+        </div>
+
+        <!-- Tab 4: PAM Ephemeral Session -->
+        <div class="tab-pane" id="tab-pane-pam">
+          <div class="pam-card">
+            <div>
+              <div style="font-family: var(--font-main); font-weight: 700; color: var(--neon-purple); font-size: 1.1rem; margin-bottom: 0.2rem;">
+                Privileged Access Management (HashiCorp Vault / CyberArk)
+              </div>
+              <p class="pam-status-text" style="color: var(--text-muted);">
+                Zero-Trust Rule: Credentials are not hardcoded. The engine requests a single-use 5-minute ephemeral token to apply changes, then revokes it immediately.
+              </p>
+            </div>
+            <div class="pam-countdown" id="pam-timer-display" title="Remaining token validity window">
+              05:00
+            </div>
+          </div>
+
+          <div class="info-grid">
+            <div class="info-box">
+              <div class="info-box-title">PAM Auth Mode</div>
+              <div class="info-box-value">Dynamic Ephemeral SSH / Token</div>
+            </div>
+            <div class="info-box">
+              <div class="info-box-title">Token Lifetime</div>
+              <div class="info-box-value">300 Seconds (5 Mins)</div>
+            </div>
+            <div class="info-box">
+              <div class="info-box-title">Auto-Revocation</div>
+              <div class="info-box-value" style="color: var(--color-success);">Strictly Enforced Post-Exec</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer (HITL Approval Gate) -->
+      <div class="modal-footer" id="hitl-action-bar">
+        <input type="text" id="hitl-notes-field" class="hitl-notes-input" placeholder="Engineer approval notes or justification (e.g. Approved for off-peak deployment)...">
+        <div class="hitl-action-buttons">
+          <button type="button" class="btn-hitl reject" id="btn-hitl-reject" onclick="submitHitl('REJECTED')">
+            ❌ Reject Remediation
+          </button>
+          <button type="button" class="btn-hitl approve" id="btn-hitl-approve" onclick="submitHitl('APPROVED')">
+            🛡️ Approve &amp; Execute Fix
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
